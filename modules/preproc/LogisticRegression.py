@@ -82,7 +82,7 @@ if __name__ == "__main__":
     from sklearn.linear_model import LogisticRegression
     from AutoImputer import SkewBasedImputer
 
-    df = pd.read_csv('./data/train.csv')
+    df = pd.read_csv('./Titanic/data/train.csv')
     categorical_columns = ['Pclass']
     continuous_columns=['Age','Fare']
 
