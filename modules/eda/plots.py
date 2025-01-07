@@ -38,7 +38,8 @@ class Exploratory():
         target_col = list(set([x for x in [x, hue] if x is not None])) 
         count = data[target_col].value_counts()[:topn].sort_index().reset_index(name='count')
         ax = sns.barplot(data=count, hue=hue, x=x, y='count')
-        ax.bar_label(ax.containers[0], fontsize=8)
+        for container in ax.containers:
+            ax.bar_label(container, fontsize=8)
         return ax
 
     def _group_stack_barplot(self, data, x, y, hue):
