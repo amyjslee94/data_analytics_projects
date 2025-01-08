@@ -19,7 +19,7 @@ class Exploratory():
         out_df = df.copy()
         int_col_value_count = df.select_dtypes(include='int64').nunique()
         for col in int_col_value_count[int_col_value_count<=10].index: 
-            out_df[col] = out_df[col].astype('object')
+            out_df[col] = pd.Categorical(out_df[col], categories=sorted(list(set(out_df[col]))),ordered=True)
         return out_df
     
     def _get_target_col(self, df, col):
@@ -113,6 +113,7 @@ class Exploratory():
                         else:
                             self._group_stack_barplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue)
                     else:
+                        print(dtype_mod_df[[xcol, ycol]].dtypes)
                         sns.violinplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue, split=True, gap=0.1, inner='quartile', ax=ax)
                         for l in ax.lines[1::3]:
                             l.set_color('red')
@@ -161,13 +162,13 @@ if __name__ == "__main__":
         return X[['transformed']]
 
     df['cabin_count'] = get_cabin_count(df[['Cabin']])
-
+    # df['Parch'] = pd.Categorical(df['Parch'], categories=sorted(list(set(df['Parch']))),ordered=True)
 
     feature_columns = list(set(df.columns).difference(set(['PassengerId','Name','Ticket'])))
     # t = df['Cabin'].value_counts()[:10].sort_index()
     # sns.barplot(data = t)
     # plt.show()
-    Exploratory(df = df[feature_columns], figsize = (10,10), ncol = 4, x=['Pclass','Embarked'], y=['Sex','cabin_flg'], hue='Survived').plot()
+    Exploratory(df = df[feature_columns], figsize = (10,10), ncol = 4, x=['Age','Sex'], y=['Parch','Embarked'], hue='Survived').plot()
     # dict = {['a','b']:['a'], ['c','d','f']:['b']}
 
         
