@@ -113,7 +113,6 @@ class Exploratory():
                         else:
                             self._group_stack_barplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue)
                     else:
-                        print(dtype_mod_df[[xcol, ycol]].dtypes)
                         sns.violinplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue, split=True, gap=0.1, inner='quartile', ax=ax)
                         for l in ax.lines[1::3]:
                             l.set_color('red')
