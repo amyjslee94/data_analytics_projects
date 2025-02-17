@@ -10,12 +10,13 @@ from scipy.stats import skew
 import warnings
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-
+        
 class LogOddsTransformer(BaseEstimator, TransformerMixin):
     def __init__(self, max_iter=5, epsilon=1):
         self.max_iter = max_iter
         self.epsilon = epsilon
         self.transformations_ = {}
+        self.feature_names_in_ = None
     
     def _pred_second_derivative(self, model, X, col):
         predictions = model.predict(X)
@@ -44,9 +45,9 @@ class LogOddsTransformer(BaseEstimator, TransformerMixin):
             return x
 
     def fit(self, X, y):
-        X = pd.DataFrame(X)
+        self.feature_names_in_ = X.columns if isinstance(X, pd.DataFrame) else None
         y = pd.Series(y)
-        X_t = X.copy()
+        X_t = pd.DataFrame(X).copy()
         
         transformation_order = ["sqrt","log","pwr2", "neg_inv_sqrt","pwr3","neg_inv", "pwr4"]
         for col in X_t.columns:
@@ -55,7 +56,6 @@ class LogOddsTransformer(BaseEstimator, TransformerMixin):
                 feature[f'{col}_log'] = feature[col] * np.log(feature[col] + 1)
                 feature = sm.add_constant(feature, prepend = False)
                 
-
                 target = y[feature.index]
                 logit = sm.Logit(target, feature).fit(disp=False)
                 logodds_pval = logit.pvalues.get(f'{col}_log', None)
@@ -66,7 +66,7 @@ class LogOddsTransformer(BaseEstimator, TransformerMixin):
                 transformation_method = transformation_order[iter]
                 self.transformations_[col] = transformation_method
                 X_t[col] = self._transform_column(X[col], transformation_method)
-
+    
         return self
                 
     def transform(self, X):
@@ -76,34 +76,108 @@ class LogOddsTransformer(BaseEstimator, TransformerMixin):
                 X_transformed[[col]] = self._transform_column(X_transformed[[col]], transformation)
         return X_transformed
 
+    def get_feature_names_out(self, input_features=None):
+        if self.feature_names_in_ is None:
+            raise AttributeError("Feature names are not available. Fit the transformer first.")
+        return self.feature_names_in_
+
+class InteractionTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, interaction_pairs):
+        self.interaction_pairs = interaction_pairs
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        X = pd.DataFrame(X)
+        X_t=X.copy()
+        for pairs in self.interaction_pairs:
+            group1 = [col for col in X.columns if pairs[0] in col]
+            group2 = [col for col in X.columns if pairs[1] in col]
+            if len(group1)==0 or len(group2)==0:
+                continue
+            for x1 in group1:
+                for x2 in group2:
+                    X_t[f'{x1.split("__")[-1]}_{x2.split("__")[-1]}'] = X[x1] * X[x2]
+        return X_t
+    
 if __name__ == "__main__":
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import cross_validate
     from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import OneHotEncoder
     from AutoImputer import SkewBasedImputer
 
     df = pd.read_csv('./Titanic/data/train.csv')
-    categorical_columns = ['Pclass']
-    continuous_columns=['Age','Fare']
+    def get_family_flg(X):
+        def family_onboard(X):
+            if X['SibSp'] == 0 and X['Parch'] == 0:
+                return 'no_fam'
+            elif X['SibSp'] > 0 and X['Parch'] == 0:
+                return 'SibSp'
+            elif X['SibSp'] == 0 and X['Parch'] > 0:
+                return 'Parch'
+            elif X['SibSp'] > 0 and X['Parch'] > 0:
+                return 'big_fam'
+            else:
+                return 'NA'
+        X = X.copy()
+        X['transformed'] = X.apply(lambda x: family_onboard(x), axis=1)
+        X['transformed'] = pd.Categorical(X['transformed'],
+                                        categories=sorted(list(set(X['transformed']))),
+                                        ordered=True)
+        return X[['transformed']]
 
-    logit_continuous_transformer_pipeline = Pipeline([
+    df['family_flg'] = get_family_flg(df[['SibSp','Parch']])
+    categorical_columns = ['Pclass','family_flg']
+    continuous_columns=['Age','Fare']
+    interaction_terms = [
+        # ('Age','cabin_flg'),
+        ('Age','family_flg'),
+        # ('Age','Pclass'),
+        # ('cabin_flg','family_flg'),
+        # ('cabin_flg','Fare'),
+        # ('cabin_flg','Pclass_1'),
+        # ('cabin_flg','Sex'),
+        # ('Embarked','family_flg_no_fam'),
+        # ('Embarked','Fare'),
+        # ('Embarked','Pclass_3'),
+        # ('Embarked','ticket_share_flg'),
+        ('family_flg','Pclass')
+        # ('family_flg','ticket_share_flg'),
+        # ('Pclass','Sex'),
+        # ('Pclass','ticket_share_flg')
+    ]
+
+    logit_continuous_pipeline = Pipeline([
         ('logodds', LogOddsTransformer(max_iter=7)),
-        ('scaler', StandardScaler()),
+        ('scaler', StandardScaler().set_output(transform="pandas")),
         ('impute', SkewBasedImputer())
     ])
 
+    logit_categorical_pipeline = Pipeline([
+        ('one-hot encoding', OneHotEncoder(sparse_output=False))
+    ])
     logit_preprocessor = ColumnTransformer(
         transformers=[
-            ('cont_pipeline', logit_continuous_transformer_pipeline, continuous_columns)
-        ]
+            ('cont_pipeline', logit_continuous_pipeline, continuous_columns),
+            ('cat_pipeline', logit_categorical_pipeline, categorical_columns),
+        ],
+        verbose_feature_names_out=False
     )
+    # logit_preprocessor.get_feature_names_out()
+    logit_preprocessor.set_output(transform='pandas')
+
     logit_full_pipeline = Pipeline([
         ('preprocessor', logit_preprocessor),
-        ('model', LogisticRegression(penalty='l2', solver='liblinear'))
+        ('interaction', InteractionTransformer(interaction_terms)),
+        ('model', LogisticRegression(penalty='l1', solver='liblinear'))
     ])
-
+    
+    df = df.loc[~df['Embarked'].isna()]
     X = df[categorical_columns + continuous_columns]
     y = df['Survived']
+
 
     cv = 7
     scoring = {'acc': 'accuracy',
@@ -115,4 +189,101 @@ if __name__ == "__main__":
     for x,y in scores.items():
         print(x)
         print(np.mean(y))
+
+
+    # # logit_preprocessor.set_output(transform="pandas")
+    # test = logit_full_pipeline.fit_transform(X,y)
+    # # logit_preprocessor
+    # # X_transformed = logit_preprocessor.fit_transform(X, y)
+    # test = logit_full_pipeline.fit_transform(X, y)
+    # print(test)
+    # # logit_preprocessor.fit(X, y)
+    # # print(logit_preprocessor.named_transformers_['cont_pipeline'].named_steps['scaler'].get_feature_names_out())
+    # # print(logit_preprocessor.named_transformers_['cont_pipeline'].named_steps['impute'].get_feature_names_out())
+    # # print(logit_preprocessor.named_transformers_['cat_pipeline'].named_steps['one-hot encoding'].get_feature_names_out(categorical_columns))
+    
+    # # logit_preprocessor.set_output(transform='pandas')
+    
+    # print(test)
+    
+
+
+
+
+
+
+
+    # #     # Get continuous feature names
+    # # cont_features = continuous_columns  # 'Age', 'Fare'
+
+    # # # Get categorical feature names after one-hot encoding
+    # # cat_features = logit_preprocessor.named_transformers_['cat_pipeline'].named_steps['one-hot encoding'].get_feature_names_out(categorical_columns)
+
+    # # # Combine feature names from continuous and categorical transformations
+    # # initial_feature_names = list(cont_features) + list(cat_features)
+
+    # # # Add interaction terms to the feature names
+    # # interaction_features = []
+    # # for pairs in interaction_terms:
+    # #     group1 = [col for col in initial_feature_names if pairs[0] in col]
+    # #     group2 = [col for col in initial_feature_names if pairs[1] in col]
+    # #     for x1 in group1:
+    # #         for x2 in group2:
+    # #             interaction_features.append(f'{x1}_{x2}')
+
+    # # # Combine all feature names
+    # # all_feature_names = initial_feature_names + interaction_features
+
+    # # # Inspect the transformed data
+    # # X_transformed = logit_full_pipeline.fit_transform(X, y)
+    # # print(X_transformed)
+    # # X_transformed_df = pd.DataFrame(X_transformed, columns=all_feature_names)
+
+    # # # Display the first few rows of the transformed DataFrame
+    # # print(X_transformed_df.head())
+
+
+
+
+
+
+    # # # Fit the preprocessing pipeline and transform the data
+    # # X_transformed = logit_preprocessor.fit_transform(X, y)
+
+    # # # Convert the transformed data into a DataFrame for inspection
+    # # # Extract feature names from the preprocessing pipeline
+    # # 
+
+    # # # Get transformed feature names
+    # # cont_features = continuous_columns
+    # # cat_features = logit_preprocessor.named_transformers_['cat_pipeline'].named_steps['one-hot encoding'].get_feature_names_out(categorical_columns)
+    
+
+    # # # Combine all feature names
+    # # feature_names = list(cont_features) + list(cat_features)
+
+    # # # Convert to DataFrame for easier inspection
+    # # X_transformed_df = pd.DataFrame(X_transformed, columns=feature_names)
+
+    # # # Display the first few rows of the transformed DataFrame
+    # # print(X_transformed_df.head())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+
+    
         # print(y)

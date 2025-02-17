@@ -43,7 +43,7 @@ class Exploratory():
         return ax
 
     def _group_stack_barplot(self, data, x, y, hue):
-        topn = 10 * data[y].nunique() * data[hue].nunique()
+        topn = 10 * data[hue].nunique() * data[y].nunique()
         target_col = list(set([x for x in [x, y, hue] if x is not None]))
         count = data[target_col].value_counts()[:topn].to_frame().sort_index(ascending=False)
         count['cs'] = count.groupby([x, y], observed=False).cumsum()
@@ -60,7 +60,7 @@ class Exploratory():
         palette = ['pastel',"deep","muted","bright","dark"] * data[hue].nunique()
         custom_legends, true_val = [], []
 
-        for i,g in enumerate(count.groupby(hue)):
+        for i,g in enumerate(count.groupby(hue, observed=False)):
             sorted_data=g[1].sort_values(by=[x, y], ascending=True)
             ax = sns.barplot(data = sorted_data, x = x, y='cs', hue=y, palette=palette[i], edgecolor='k')
 
