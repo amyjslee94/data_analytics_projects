@@ -4,7 +4,7 @@ Welcome to the Data Analytics Projects repository! This repository contains data
 
 ## Projects
 
-### 1. Titanic Survival Prediction
+### 1. Titanic Survival Prediction (~ 80% Complete)
 
 **Objective**: Fit a predictive model to determine passenger survival likelihood based on various features.
 
@@ -14,7 +14,7 @@ Welcome to the Data Analytics Projects repository! This repository contains data
 
 - **Outcome**: A model capable of predicting survival probability with reasonable accuracy.
 
-### 2. Music Streaming Analysis & Prediction
+### 2. Music Streaming Analysis & Prediction (Just Getting Started)
 
 **Objective**: Utilize MusicBrainz and streaming platform data (Spotify, YouTube) to analyze music performance and predict future hits.
 
