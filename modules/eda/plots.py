@@ -78,6 +78,8 @@ class Exploratory():
         
         handles, _ = ax.get_legend_handles_labels()
         ax.legend(handles, custom_legends, loc='upper left', fontsize=8)
+        ax.tick_params(axis='x', labelsize=6)
+        ax.tick_params(axis='y', labelsize=6) 
         return ax
 
     def plot(self):
@@ -98,7 +100,7 @@ class Exploratory():
                 else:
                     self._group_barplot(data=dtype_mod_df, x=col, hue=self.hue)
                 ax.set(xlabel = None)
-                ax.set_title(col, fontsize=15)
+                ax.set_title(col, fontsize=12)
         
         else:
             nrow, ncol = len(target_ycol), len(target_xcol)          
@@ -120,7 +122,6 @@ class Exploratory():
                     sns.scatterplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue, ax=ax)
                 ax.set(xlabel = None, ylabel=None)
                 ax.set_title(f'{xcol} vs {ycol}', fontsize=15)
-        plt.tight_layout()
         plt.show()
 
 if __name__ == "__main__":
