@@ -81,7 +81,7 @@ class Exploratory():
         return ax
 
     def plot(self):
-        fig = plt.figure(figsize=self.figsize)
+        fig = plt.figure(figsize=self.figsize, constrained_layout=True)
         dtype_mod_df = self._adjust_dtypes(self.df)
         if self.hue is not None:
             dtype_mod_df = dtype_mod_df.sort_values(by=self.hue)
@@ -120,7 +120,7 @@ class Exploratory():
                     sns.scatterplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue, ax=ax)
                 ax.set(xlabel = None, ylabel=None)
                 ax.set_title(f'{xcol} vs {ycol}', fontsize=15)
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.show()
 
 if __name__ == "__main__":
