@@ -120,7 +120,7 @@ class Exploratory():
                     sns.scatterplot(data=dtype_mod_df, x=xcol, y=ycol, hue=self.hue, ax=ax)
                 ax.set(xlabel = None, ylabel=None)
                 ax.set_title(f'{xcol} vs {ycol}', fontsize=15)
-        # plt.tight_layout()
+        plt.tight_layout()
         plt.show()
 
 if __name__ == "__main__":
