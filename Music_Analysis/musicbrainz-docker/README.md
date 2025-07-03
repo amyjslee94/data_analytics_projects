@@ -87,7 +87,7 @@ If you use [UFW](https://help.ubuntu.com/community/UFW) to manage your firewall:
 
 ## Components version
 
-* Current MB Branch: [v-2024-12-09.0](build/musicbrainz/Dockerfile#L88)
+* Current MB Branch: [v-2025-04-14.0](build/musicbrainz/Dockerfile#L88)
 * Current DB_SCHEMA_SEQUENCE: [29](build/musicbrainz/Dockerfile#L125)
 * Postgres Version: [16](docker-compose.yml)
   (can be changed by setting the environment variable `POSTGRES_VERSION`)
@@ -455,6 +455,16 @@ Try `admin/configure help` for more information.
 
 #### Publish ports of all services
 
+:warning: The service `search` is currently running Solr 7 in
+standalone mode which is vulnerable to privilege escalation.
+See [CVE-2025-24814](https://lists.apache.org/thread/gl291pn8x9f9n52ys5l0pc0b6qtf0qw1) for details.
+We are working on upgrading to Solr 9 in SolrCloud mode.
+See [SEARCH-685](https://tickets.metabrainz.org/browse/SEARCH-685) for follow-up.
+In general, Solr is strongly recommended to be accessible to your own clients only.
+See [Solr Security](https://cwiki.apache.org/confluence/display/SOLR/SolrSecurity) for details.
+Similarly, other services have not been configured to be safely publicly accessible either.
+Take this warning in consideration when publishing their ports.
+
 To publish ports of services `db`, `mq`, `redis` and `search`
 (additionally to `musicbrainz`) on the host, simply run:
 
@@ -580,9 +590,21 @@ Simply restart the container when checking out a new branch.
 
 This is very similar to the above but for Search Index Rebuilder (SIR):
 
-1. Set the variable `SIR_LOCAL_ROOT` in the `.env` file
+1. Optionally set the following variables in the `.env` file:
+   - `SIR_DEV_CONFIG_PATH`
+     (Default: `./default/config.ini` replacing `SIR_CONFIG_PATH`)
+   - `SIR_DEV_LOCAL_ROOT`
+     (Default: `../sir` assuming that `musicbrainz-docker` and `sir`
+     have been cloned under the same parent directory)
+   - `SIR_DEV_PYTHON_VERSION`
+     (Default: `2.7` matching `metabrainz/python` image tag)
+   - `SIR_DEV_BASE_IMAGE_DATE`
+     (Default: `20220421` matching `metabrainz/python` image tag)
+   - `SIR_DEV_VERSION`
+     (Default: `py27-stage1` which is informative only)
 2. Run `admin/configure add sir-dev`
-3. Run `sudo docker-compose up -d`
+3. Run `sudo docker-compose build indexer`
+4. Run `sudo docker-compose up -d`
 
 Notes:
 

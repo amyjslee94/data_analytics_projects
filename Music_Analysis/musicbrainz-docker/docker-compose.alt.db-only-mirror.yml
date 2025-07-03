@@ -27,12 +27,6 @@ services:
       - pgdata:/var/lib/postgresql/data
     expose:
       - "5432"
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: musicbrainz
-      POSTGRES_PASSWORD: musicbrainz
-      POSTGRES_DB: musicbrainz
 
   musicbrainz:
     build:
