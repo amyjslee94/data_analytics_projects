@@ -5,13 +5,14 @@ import seaborn as sns
 import math
 
 class Exploratory():
-    def __init__(self, df, figsize : tuple = (10,5), ncol = 3, x='all', y=None, hue=None ):
+    def __init__(self, df, figsize : tuple = (10,5), ncol = 3, x='all', y=None, hue=None, legend_max = 10):
         self.figsize = figsize
         self.ncol = ncol
         self.df = df
         self.x = x
         self.y = y
         self.hue = hue
+        self.legend_max = legend_max
 
     def _adjust_dtypes(self, df):
         # checks nunique of integer columns and change column dtype to 'object' 
@@ -40,13 +41,18 @@ class Exploratory():
         ax = sns.barplot(data=count, hue=hue, x=x, y='count')
         for container in ax.containers:
             ax.bar_label(container, fontsize=8)
+        handles, labels = plt.gca().get_legend_handles_labels()
+        if len(labels)>self.legend_max:
+            handles = handles[:self.legend_max]
+            labels = labels[:self.legend_max-1]+["..."]
+        plt.legend(handles=handles, labels=labels)
         return ax
 
     def _group_stack_barplot(self, data, x, y, hue):
         topn = 10 * data[hue].nunique() * data[y].nunique()
         target_col = list(set([x for x in [x, y, hue] if x is not None]))
         count = data[target_col].value_counts()[:topn].to_frame().sort_index(ascending=False)
-        count['cs'] = count.groupby([x, y], observed=False).cumsum()
+        count['cs'] = count.groupby([x, y], observed=True).cumsum()
         count.reset_index(inplace=True)
         
         ## for every possible groups of x,y,hue, if the data doesn't exist, it returns 0.
@@ -60,15 +66,17 @@ class Exploratory():
         palette = ['pastel',"deep","muted","bright","dark"] * data[hue].nunique()
         custom_legends, true_val = [], []
 
-        for i,g in enumerate(count.groupby(hue, observed=False)):
+        for i,g in enumerate(count.groupby(hue, observed=True)):
             sorted_data=g[1].sort_values(by=[x, y], ascending=True)
             ax = sns.barplot(data = sorted_data, x = x, y='cs', hue=y, palette=palette[i], edgecolor='k')
 
-            for g1 in sorted_data.groupby(y, observed=False):
+            for g1 in sorted_data.groupby(y, observed=True):
                 custom_legends.append(f"{y}={''.join(map(str, g1[1][y].unique()))} & {hue}={''.join(map(str, g1[1][hue].unique()))}")
                 true_val.append(list(g1[1]['count']))
         
         for i, container in enumerate(ax.containers):
+            if i >= len(true_val):
+                break
             va_position, y_const = ('bottom', 2) if i<count[y].nunique() else ('top', -2) ## top bar gets label on top while every other will get the label on the bottom
             for bar, label in zip(container, true_val[i]):
                 ax.text(
@@ -77,6 +85,7 @@ class Exploratory():
                 )
         
         handles, _ = ax.get_legend_handles_labels()
+        custom_legends = custom_legends if len(custom_legends)<=self.legend_max else custom_legends[:self.legend_max-1]+["..."]
         ax.legend(handles, custom_legends, loc='upper left', fontsize=8)
         return ax
 
@@ -170,7 +179,7 @@ if __name__ == "__main__":
     # t = df['Cabin'].value_counts()[:10].sort_index()
     # sns.barplot(data = t)
     # plt.show()
-    Exploratory(df = df[feature_columns], figsize = (10,10), ncol = 4, x=['Age','Sex'], y=['Parch','Embarked'], hue='Survived').plot()
+    Exploratory(df = df[feature_columns], figsize = (10,10), ncol = 4, x=['Age','Sex','Survived'], y=['Parch','Embarked'], hue='Survived', legend_max=5).plot()
     # dict = {['a','b']:['a'], ['c','d','f']:['b']}
 
         
